@@ -6,7 +6,8 @@ module SugarCRM; class Session
   def initialize(url, user, pass, opts={})
     options = { 
       :debug  => false,
-      :register_modules => true
+      :register_modules => true,
+      :autoconnect => true
     }.merge(opts)
     
     @modules    = []
@@ -16,7 +17,7 @@ module SugarCRM; class Session
     
     setup_connection
     register_namespace
-    connect(@config[:base_url], @config[:username], @config[:password], @config[:options])
+    connect(@config[:base_url], @config[:username], @config[:password], @config[:options]) if options[:autoconnect]
   end
   
   # Creates a new session from the credentials present in a file
@@ -57,6 +58,9 @@ module SugarCRM; class Session
       :debug  => @config[:options][:debug],
       :register_modules => true
     }.merge(opts)
+    url ||= @config[:base_url]
+    user ||= @config[:username]
+    pass ||= @config[:password]
     
     # store the params used to connect
     {:base_url => url, :username => user, :password => pass}.each{|k,v|

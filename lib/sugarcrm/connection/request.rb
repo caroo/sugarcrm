@@ -16,6 +16,7 @@ module SugarCRM; class Request
     if debug
       puts "#{method}: Request:"
       puts json 
+      puts self.to_s
       puts "\n"
     end
     self

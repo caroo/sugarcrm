@@ -20,7 +20,8 @@ module SugarCRM; class Connection
     @options  = {
       :debug => false,
       :register_modules => true,
-      :load_environment => true
+      :load_environment => true,
+      :autoconnect => true
     }.merge(options)
     @url      = URI.parse(url)
     @user     = user
@@ -28,7 +29,7 @@ module SugarCRM; class Connection
     @request  = ""
     @response = ""
     resolve_url
-    login!
+    login! if @options[:autoconnect]
     self
   end
   
