@@ -86,7 +86,7 @@ module SugarCRM
         local_options[:order_by] = :id unless options[:order_by]
 
         # we must ensure limit <= offset (due to bug mentioned above)
-        if offset > 0
+        if offset
           local_options[:limit] = [offset.to_i, SLICE_SIZE].min
           local_options[:offset] = offset if offset
         else
