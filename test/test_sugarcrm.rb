@@ -187,6 +187,27 @@ class TestSugarCRM < ActiveSupport::TestCase
       user = SugarCRM::User.first
       assert_equal "#{SugarCRM.session.config[:base_url]}/index.php?module=Users&action=DetailView&record=#{user.id}", user.url
     end
+    
+    should "respond to #blank?" do
+      assert !SugarCRM::User.first.blank?
+    end
+    
+    should "bypass validation when #save(:validate => false)" do
+      u = SugarCRM::User.new
+      u.last_name = "doe"
+      assert u.save(:validate => false)
+      assert u.delete
+    end
+  end
+
+  # TODO: Fix this test so it creates the Note properly before asserting.
+  context  "A SugarCRM::Note instance" do
+    should "return the correct parent record with the `parent` method" do
+      note = SugarCRM::Note.first
+      parent = note.parent
+      assert_equal note.parent_id, parent.id
+      assert_equal note.parent_type.singularize, parent.class.to_s.split('::').last
+    end
   end
   
 end

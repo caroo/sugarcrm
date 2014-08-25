@@ -18,11 +18,7 @@ module SugarCRM; class Base
   self.session = nil
 
   # Contains a list of attributes
-  attr :attributes, true
-  attr :modified_attributes, true
-  attr :associations, true
-  attr :debug, true
-  attr :errors, true
+  attr_accessor :attributes,  :modified_attributes, :associations, :debug, :errors
 
   class << self # Class methods
     def find(*args, &block)
@@ -36,8 +32,13 @@ module SugarCRM; class Base
         sort_criteria = 'date_entered'
       elsif self.method_defined? :date_created
         sort_criteria = 'date_created'
+      # Added date_modified because TeamSets doesn't have a date_created or date_entered field.
+      # There's no test for this because it's Pro and above only.
+      # Hope this doesn't break anything!
+      elsif self.method_defined? :date_modified
+        sort_criteria = 'date_modified'
       else
-        raise InvalidAttribute, "Unable to determine record creation date for sorting criteria: expected date_entered or date_created attribute to be present"
+        raise InvalidAttribute, "Unable to determine record creation date for sorting criteria: expected date_entered, date_created, or date_modified attribute to be present"
       end
       options = {:order_by => sort_criteria}.merge(options)
       validate_find_options(options)
@@ -150,12 +151,50 @@ module SugarCRM; class Base
     "#<#{self.class} #{attrs.join(", ")}>"
   end
 
+  # objects are considered equal if they represent the same SugarCRM record
+  # this behavior is required for Rails to be able to properly cast objects to json (lists, in particular)
+  def equal?(other)
+    return false unless other && other.respond_to?(:id)
+     self.id == other.id
+  end
+
+  # return variables that are defined in SugarCRM, instead of the object's actual variables (such as modified_attributes, errors, etc.)
+  def instance_variables
+    @_instance_variables ||= @attributes.keys.map{|i| ('@' + i).to_sym }
+  end
+
+  # override to return the value of the SugarCRM record's attributes
+  def instance_variable_get(name)
+    name = name.to_s.gsub(/^@/,'')
+    @attributes[name]
+  end
+
+  # Rails requires this to (e.g.) generate json representations of models
+  # this code taken directly from the Rails project
+  if defined?(Rails)
+    def instance_values
+      Hash[instance_variables.map { |name| [name.to_s[1..-1], instance_variable_get(name)] }]
+    end
+  end
+
+  def to_json(options={})
+    attributes.to_json
+  end
+
+  def to_xml(options={})
+    attributes.to_xml
+  end
+
   # Saves the current object, checks that required fields are present.
   # returns true or false
-  def save
-    return false if !valid?
+  def save(opts={})
+    options = { :validate => true }.merge(opts)
+    return false if !(new_record? || changed?)
+    if options[:validate]
+      return false if !valid?
+    end
     begin
-      save!
+      save!(options)
     rescue
       return false
     end
@@ -164,8 +203,8 @@ module SugarCRM; class Base
 
   # Saves the current object, and any modified associations.
   # Raises an exceptions if save fails for any reason.
-  def save!
-    save_modified_attributes!
+  def save!(opts={})
+    save_modified_attributes!(opts)
     save_modified_associations!
     true
   end
@@ -189,10 +228,15 @@ module SugarCRM; class Base
     self.attributes = self.class.find(self.id).attributes
     self
   end
-
   alias reload! reload
 
-  # Returns true if +comparison_object+ is the same exact object, or +comparison_object+
+
+  def blank?
+    @attributes.empty?
+  end
+  alias :empty? :blank?
+
+  # Returns true if +comparison_object+ is the same exact object, or +comparison_object+ 
   # is of the same type and +self+ has an ID and it is equal to +comparison_object.id+.
   #
   # Note that new records are different from any other record by definition, unless the
@@ -240,7 +284,7 @@ module SugarCRM; class Base
 
   # Returns the URL (in string format) where the module instance is available in CRM
   def url
-    "#{SugarCRM.session.config[:base_url]}/index.php?module=#{self.class._module}&action=DetailView&record=#{self.id}"
+    "#{SugarCRM.session.config[:base_url]}/index.php?module=#{self.class._module.name}&action=DetailView&record=#{self.id}"
   end
 
   # Delegates to id in order to allow two records of the same type and id to work with something like:

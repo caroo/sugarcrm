@@ -112,18 +112,31 @@ module SugarCRM; module AttributeMethods
   def define_attribute_methods
     return if attribute_methods_generated?
     @attributes.keys.sort.each do |k|
+      # ajay Singh --> skip the loop if attribute is null
+      next if !k.present?
       self.class.module_eval %Q?
-      def #{k}
-        read_attribute :#{k}
-      end
-      def #{k}=(value)
-        write_attribute :#{k},value
-      end
-      def #{k}\?
-        has_attribute\? :#{k}
+        def #{k}
+          read_attribute :#{k}
+        end
+        def #{k}=(value)
+          write_attribute :#{k},value
+        end
+        def #{k}\?
+          has_attribute\? :#{k}
+        end
+      ?
+    end
+    
+    # return the (polymorphic) parent record corresponding to the parent_id and parent_type attributes
+    # (an example of parent polymorphism can be found in the Note module)
+    if (@attributes.keys.include? 'parent_id') && (@attributes.keys.include? 'parent_type')
+      self.class.module_eval %Q?
+      def parent
+        (self.class.session.namespace_const.const_get @attributes['parent_type'].singularize).find(@attributes['parent_id'])
       end
       ?
     end
+    
     self.class.attribute_methods_generated = true
   end
 
@@ -153,9 +166,12 @@ module SugarCRM; module AttributeMethods
   
   # Wrapper for invoking save on modified_attributes
   # sets the id if it's a new record
-  def save_modified_attributes!
-    # Complain if we aren't valid
-    raise InvalidRecord, @errors.full_messages.join(", ") unless valid?
+  def save_modified_attributes!(opts={})
+    options = { :validate => true }.merge(opts)
+    if options[:validate]
+      # Complain if we aren't valid
+      raise InvalidRecord, @errors.full_messages.join(", ") unless valid?
+    end
     # Send the save request
     response = self.class.session.connection.set_entry(self.class._module.name, serialize_modified_attributes)
     # Complain if we don't get a parseable response back

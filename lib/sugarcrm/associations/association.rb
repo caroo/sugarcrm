@@ -5,14 +5,8 @@ module SugarCRM
   # allow access to the association collection, and are held in @proxy_methods.  The cardinality 
   # of the association is available in @cardinality, and the actual relationship details are held
   # in @relationship.
-  class Association    
-    attr :owner, true
-    attr :target, true
-    attr :link_field, true
-    attr :relationship, true
-    attr :attributes, true 
-    attr :proxy_methods, true
-    attr :cardinality, true
+  class Association
+    attr_accessor :owner, :target, :link_field, :relationship, :attributes, :proxy_methods, :cardinality
     
     # Creates a new instance of an Association
     def initialize(owner,link_field,opts={})
@@ -78,7 +72,7 @@ module SugarCRM
       # Use the link_field attribute "module"
       if @attributes["module"].length > 0
         module_name = SugarCRM::Module.find(@attributes["module"], @owner.class.session)
-        return namespace.const_get(module_name.klass) if namespace.const_defined? module_name.klass
+        return namespace.const_get(module_name.klass) if module_name && namespace.const_defined?(module_name.klass)
       end
       # Use the "relationship" target
       if @attributes["relationship"].length > 0
@@ -102,7 +96,7 @@ module SugarCRM
     
     # Generates the association proxy method for related module
     def define_method(link_field)
-      raise ArgumentException, "argument cannot be nil" if link_field.nil?
+      raise ArgumentError, "argument cannot be nil" if link_field.nil?
       if (@owner.respond_to? link_field.to_sym) && @owner.debug
         warn "Warning: Overriding method: #{@owner.class}##{link_field}"
       end
